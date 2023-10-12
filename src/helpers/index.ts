@@ -16,7 +16,7 @@ OAuth2_client.setCredentials({ refresh_token: clientRefreshToken });
 
 const SECRET = "GYM_API";
 
-export const sendVerificationEmail = ({
+export const sendVerificationEmail = async ({
   userEmail,
   verificationCode,
 }: {
@@ -45,6 +45,7 @@ export const sendVerificationEmail = ({
     html: `
     <body>
       <div style="padding: 20px;text-align: center; background-color: #3D3D3D;">
+        <img src="https://constfitness.vercel.app/const-logo.png" alt="const-logo" width="200" height="200">
         <p>
         Your <span style="font-weight: bolder">CONSTfitness</span> verification code
         </p>
@@ -56,15 +57,18 @@ export const sendVerificationEmail = ({
     `,
   };
 
-  transporter.sendMail(options, (err: Error, res: any) => {
-    if (err) {
-      console.log(err);
-      return false;
-    } else {
-      console.log(res);
-      return true;
-    }
+  const sendEmail = new Promise((resolve, reject) => {
+    transporter.sendMail(options, (err: Error, res: any) => {
+      if (err) {
+        reject(false);
+      } else {
+        resolve(true);
+      }
+    });
   });
+  const emailStatus = await sendEmail;
+  console.log(emailStatus);
+  return await emailStatus;
 };
 
 export const random = () => crypto.randomBytes(128).toString("base64");
