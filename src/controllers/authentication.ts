@@ -1,12 +1,17 @@
 import express from "express";
 
-import { createUser, getUserByEmail } from "../db/users.js";
+import { ENV_CORS_URL } from "../constants.js";
+import { createUser, getUserByEmail, verifyUserByEmail } from "../db/users.js";
 import {
   authentication,
   random,
   verificationCodeGen,
   sendVerificationEmail,
 } from "../helpers/index.js";
+import {
+  createVerification,
+  getVerificationByEmail,
+} from "../db/verifications.js";
 
 export const login = async (req: express.Request, res: express.Response) => {
   try {
@@ -17,7 +22,7 @@ export const login = async (req: express.Request, res: express.Response) => {
     }
 
     const user = await getUserByEmail(email).select(
-      "+authentication.salt +authentication.password +verified +verification_code"
+      "+authentication.salt +authentication.password +verified"
     );
 
     if (!user) {
@@ -38,111 +43,154 @@ export const login = async (req: express.Request, res: express.Response) => {
 
     const salt = random();
 
-    user.authentication.sessiontToken = authentication(
+    user.authentication.sessionToken = authentication(
       salt,
       user._id.toString()
     );
 
     await user.save();
 
-    res.cookie("IAN_AUTH", user.authentication.sessiontToken, {
-      domain: "localhost",
+    res.cookie("CONST_AUTH", user.authentication.sessionToken, {
+      domain: ENV_CORS_URL,
       path: "/",
     });
-    console.log(user);
     return res.status(200).json(user).end();
   } catch (error) {
     console.log(error);
-    res.sendStatus(400);
+    res.sendStatus(500);
   }
 };
 
 export const register = async (req: express.Request, res: express.Response) => {
-  try {
-    const { email, username, password } = req.body;
+  const {
+    email,
+    username,
+    password,
+  }: { email: string; username: string; password: string } = req.body;
 
-    if (!email || !username || !password) {
+  if (!email || !username || !password) {
+    return res
+      .status(400)
+      .json({
+        message: "You need to fill out all fields to register",
+      })
+      .end();
+  }
+
+  const existingUser = await getUserByEmail(email);
+
+  if (existingUser) {
+    return res
+      .status(400)
+      .json({
+        message: `The email ${email} is already in use`,
+      })
+      .end();
+  }
+
+  const verificationCode = verificationCodeGen();
+  const salt = random();
+  const hashedPassword = authentication(salt, password);
+  try {
+    const user = await createUser({
+      email,
+      username,
+      verified: false,
+      authentication: {
+        salt,
+        password: hashedPassword,
+      },
+    });
+    const verification = await createVerification({
+      email,
+      verificationCode,
+    });
+
+    const emailResponse = await sendVerificationEmail({
+      email,
+      verificationCode,
+    });
+    if (user && verification && emailResponse) {
+      return res
+        .status(200)
+        .json({
+          message: `We have sent an email to ${email}.`,
+        })
+        .end();
+    } else {
+    }
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      message: error,
+    });
+  }
+};
+
+export const verify = async (req: express.Request, res: express.Response) => {
+  try {
+    const { email, code } = req.body;
+    if (!email || !code) {
       return res
         .status(400)
         .json({
-          message: "You need to fill out all fields to register",
+          message: "Please provide both an email and its associated code.",
         })
         .end();
     }
 
     const existingUser = await getUserByEmail(email);
 
-    if (existingUser) {
-      return res.status(400).json({
-        message: `The email ${email} is already in use`
-      }).end();
-    }
+    const verification = await getVerificationByEmail(email).select(
+      "+verificationCode"
+    );
 
-    const verificationCode = verificationCodeGen();
-    const salt = random();
-
-    await createUser({
-      email,
-      username,
-      verified: false,
-      verification_code: verificationCode,
-      authentication: {
-        salt,
-        password: authentication(salt, password),
-      },
-    });
-
-    const emailResponse = await sendVerificationEmail({
-      userEmail: email,
-      verificationCode,
-    });
-    console.log(emailResponse)
-
-    if (emailResponse === true) {
-      return res
-        .status(200)
+    if (!existingUser) {
+      res
+        .status(404)
         .json({
-          email_sent: emailResponse,
-          message: `We have sent you a verification code to ${email}.`,
+          message:
+            "No user under that email exists. Please register before attempting to verify.",
         })
         .end();
-    } else {
+    }
+
+    if (existingUser && !verification) {
+      const verificationCode = verificationCodeGen();
+      const emailResponse = await sendVerificationEmail({
+        email,
+        verificationCode,
+      });
+
+      if (emailResponse === true) {
+        await createVerification({
+          email,
+          verificationCode,
+        });
+        return res
+          .status(400)
+          .json({
+            message: `That code has expired, we have sent a new code to ${email} check your spam folder. Codes have a lifetime of 10 minutes before they are no longer valid.`,
+          })
+          .end();
+      } else {
+        return res
+          .status(500)
+          .json({
+            message: `That code has expired and we were unable to send a new code to ${email}. This error has been sent to the application maintainers we will send you an email when the issue is resolved.`,
+          })
+          .end();
+      }
+    }
+
+    if (existingUser && verification.verificationCode === code) {
+      verifyUserByEmail(email);
       return res
-        .status(400)
-        .json({
-          email_sent: emailResponse,
-          message: `We were unable send ${email} a verification code.`,
-        })
+        .status(200)
+        .json({ message: "Your account has been verified!" })
         .end();
     }
   } catch (error) {
     return res.sendStatus(500);
   }
 };
-
-// export const verify = async (req: express.Request, res: express.Response) => {
-//   try {
-//     const { email, code } = req.body;
-//     console.log(req.body);
-//     if (!email || !code) {
-//       return res.sendStatus(400);
-//     }
-
-//     const existingUser = await getUserByEmail(email);
-
-//     if (existingUser) {
-//       return res.sendStatus(400);
-//     }
-//     const verificationCode = verificationCodeGen();
-
-//     sendVerificationEmail({
-//       userEmail: email,
-//       verificationCode: verificationCode,
-//     });
-
-//     return res.status(200);
-//   } catch (error) {
-//     console.log(error);
-//     return res.sendStatus(400);
-//   }
-// };
