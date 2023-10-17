@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 dotenv.config();
+import { ENV_CORS_URL } from "../constants.js";
 import crypto from "crypto";
 import * as nodeMailer from "nodemailer";
 import { google } from "googleapis";
@@ -14,13 +15,13 @@ const OAuth2_client = new OAuth2(clientId, clientSecret);
 
 OAuth2_client.setCredentials({ refresh_token: clientRefreshToken });
 
-const SECRET = "GYM_API";
+const SECRET = process.env.SECRET_CRYPTO;
 
 export const sendVerificationEmail = async ({
-  userEmail,
+  email,
   verificationCode,
 }: {
-  userEmail: string;
+  email: string;
   verificationCode: string;
 }) => {
   const accessToken = OAuth2_client.getAccessToken();
@@ -40,10 +41,10 @@ export const sendVerificationEmail = async ({
 
   const options: nodeMailer.SendMailOptions = {
     from: appEmail,
-    to: userEmail,
+    to: email,
     subject: "Verification Code",
     html: `
-    <body>
+    <body style="color: white;">
       <div style="padding: 20px;text-align: center; background-color: #3D3D3D;">
         <img src="https://constfitness.vercel.app/const-logo.png" alt="const-logo" width="200" height="200">
         <p>
@@ -51,6 +52,12 @@ export const sendVerificationEmail = async ({
         </p>
         <div style="background-color: #2D2D2D; text-align: center; padding: 8px; border-radius: 4px; color: #FFD568; font-weight: bold;">
         ${verificationCode}
+        </div>
+        <p>
+        or click the following link
+        </p>
+        <div style="background-color: #2D2D2D; text-align: center; padding: 8px; border-radius: 4px; color: #FFD568; font-weight: bold;">
+        <a href="${ENV_CORS_URL}/verify?email=${email}&code=${verificationCode}">${ENV_CORS_URL}/verify?email=${email}&code=${verificationCode}</a>
         </div>
       </div>
     </body>
@@ -67,17 +74,24 @@ export const sendVerificationEmail = async ({
     });
   });
   const emailStatus = await sendEmail;
-  console.log(emailStatus);
-  return await emailStatus;
+  return emailStatus;
 };
 
 export const random = () => crypto.randomBytes(128).toString("base64");
 
 export const authentication = (salt: string, password: string) => {
-  return crypto
-    .createHmac("sha256", [salt, password].join("/"))
-    .update(SECRET)
-    .digest("hex");
+  console.log(salt)
+  console.log(password)
+  try {
+    const hash = crypto
+      .createHmac("sha256", [salt, password].join("/"))
+      .update(SECRET)
+      .digest("hex");
+    return hash;
+  } catch (error) {
+    console.error("Error generating authentication hash:", error);
+    throw error; // Rethrow the error for higher-level error handling.
+  }
 };
 
 export const verificationCodeGen = () => {

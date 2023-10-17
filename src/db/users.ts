@@ -1,35 +1,38 @@
 import mongoose from "mongoose";
 
-const UserSchema = new mongoose.Schema({
+const userSchema = new mongoose.Schema({
   username: { type: String, required: true },
   email: { type: String, required: true },
-  verified: { type: Boolean },
-  verification_code: { type: String },
+  verified: { type: Boolean, required: true },
   authentication: {
-    password: { type: String, required: true, select: false },
     salt: { type: String, select: false },
-    sessiontToken: { type: String, select: false },
+    password: { type: String, required: true, select: false },
+    sessionToken: { type: String, select: false, required: false },
   },
 });
 
-export const UserModel = mongoose.model("User", UserSchema);
+export const userModel = mongoose.model("User", userSchema);
 
-export const getUsers = () => UserModel.find();
+export const getUsers = () => userModel.find();
 
-export const getUserByEmail = (email: string) => UserModel.findOne({ email });
+export const getUserByEmail = (email: string) => userModel.findOne({ email });
 
 export const getUserBySesstionToken = (sessionToken: string) =>
-  UserModel.findOne({
+  userModel.findOne({
     "authentication.sessionToken": sessionToken,
   });
 
-export const getUserById = (id: string) => UserModel.findById({ id });
+export const getUserById = (id: string) => userModel.findById(id);
 
 export const createUser = (values: Record<string, any>) =>
-  new UserModel(values).save().then((user) => user.toObject());
-
+  new userModel(values).save().then((user) => user.toObject());
 export const deleteUser = (id: string) =>
-  UserModel.findOneAndDelete({ _id: id });
+  userModel.findOneAndDelete({ _id: id });
 
 export const updateUserById = (id: string, values: Record<string, any>) =>
-  UserModel.findByIdAndUpdate(id, values);
+  userModel.findByIdAndUpdate(id, values);
+
+export const verifyUserByEmail = (email: string) =>
+  userModel
+    .findOneAndUpdate({ email, verified: true })
+    .then((user) => console.log(user));
