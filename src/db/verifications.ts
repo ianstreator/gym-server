@@ -11,10 +11,10 @@ verificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 600 });
 const verificationModel = mongoose.model("Verification", verificationSchema);
 
 export const createVerification = (values: Record<string, any>) =>
-  new verificationModel(values).save();
+  new verificationModel(values).save()
 
 export const getVerificationByEmail = (email: string) =>
   verificationModel.findOne({ email });
 
-export const deleteVerificationByEmail = (email: string) =>
-  verificationModel.findOneAndDelete({ email });
+export const deleteVerificationsByEmail = (email: string) =>
+  verificationModel.deleteMany({ email });
