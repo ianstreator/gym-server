@@ -10,6 +10,7 @@ import {
 } from "../helpers/index.js";
 import {
   createVerification,
+  deleteVerificationsByEmail,
   getVerificationByEmail,
 } from "../db/verifications.js";
 
@@ -18,27 +19,26 @@ export const login = async (req: express.Request, res: express.Response) => {
     const { email, password } = req.body;
     console.log(email, password);
     if (!email || !password) {
-      return res.sendStatus(400);
+      return res
+        .status(400)
+        .json({ message: "Please provide both an email and password." });
     }
 
     const user = await getUserByEmail(email).select(
       "+authentication.salt +authentication.password +verified"
     );
-
-    if (!user) {
-      return res.sendStatus(400);
-    }
-
-    const expectedHash = authentication(user.authentication.salt, password);
-
-    if (user.authentication.password !== expectedHash) {
-      return res.status(403).send("email or password is incorrect.");
-    } else if (!user.verified) {
+    if (user && !user.verified) {
       return res
         .status(403)
-        .send(
-          "please verify your email. if you cannot find your verification email, you can request a new one below."
-        );
+        .json({
+          message: `You have not verified your account, we have sent a new code to ${email}`,
+        })
+        .end();
+    }
+    const expectedHash = authentication(user.authentication.salt, password);
+
+    if (!user || user.authentication.password !== expectedHash) {
+      return res.status(401).json({ message: "Incorrect email or password." });
     }
 
     const salt = random();
@@ -54,7 +54,7 @@ export const login = async (req: express.Request, res: express.Response) => {
       domain: ENV_CORS_URL,
       path: "/",
     });
-    return res.status(200).json(user).end();
+    return res.status(200).json({ user, message: "Successful login!" }).end();
   } catch (error) {
     console.log(error);
     res.sendStatus(500);
@@ -144,7 +144,6 @@ export const verify = async (req: express.Request, res: express.Response) => {
     const verification = await getVerificationByEmail(email).select(
       "+verificationCode"
     );
-
     if (!existingUser) {
       res
         .status(404)
@@ -155,7 +154,8 @@ export const verify = async (req: express.Request, res: express.Response) => {
         .end();
     }
 
-    if (existingUser && !verification) {
+    if (existingUser && verification.verificationCode !== code) {
+      await deleteVerificationsByEmail(email);
       const verificationCode = verificationCodeGen();
       const emailResponse = await sendVerificationEmail({
         email,
@@ -184,12 +184,14 @@ export const verify = async (req: express.Request, res: express.Response) => {
     }
 
     if (existingUser && verification.verificationCode === code) {
-      verifyUserByEmail(email);
+      await deleteVerificationsByEmail(email);
+      await verifyUserByEmail(email);
       return res
         .status(200)
         .json({ message: "Your account has been verified!" })
         .end();
     }
+    return res.status(500).json({ message: "Unkown error." });
   } catch (error) {
     return res.sendStatus(500);
   }
