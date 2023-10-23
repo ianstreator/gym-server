@@ -80,8 +80,6 @@ export const sendVerificationEmail = async ({
 export const random = () => crypto.randomBytes(128).toString("base64");
 
 export const authentication = (salt: string, password: string) => {
-  console.log(salt)
-  console.log(password)
   try {
     const hash = crypto
       .createHmac("sha256", [salt, password].join("/"))
@@ -90,7 +88,6 @@ export const authentication = (salt: string, password: string) => {
     return hash;
   } catch (error) {
     console.error("Error generating authentication hash:", error);
-    throw error; // Rethrow the error for higher-level error handling.
   }
 };
 

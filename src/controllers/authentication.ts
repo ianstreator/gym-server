@@ -1,18 +1,13 @@
 import express from "express";
 
 import { ENV_CORS_URL } from "../constants.js";
-import { createUser, getUserByEmail, verifyUserByEmail } from "../db/users.js";
+import { createUser, getUserByEmail, updateUserByEmail } from "../db/users.js";
 import {
   authentication,
   random,
   verificationCodeGen,
   sendVerificationEmail,
 } from "../helpers/index.js";
-import {
-  createVerification,
-  deleteVerificationsByEmail,
-  getVerificationByEmail,
-} from "../db/verifications.js";
 
 export const login = async (req: express.Request, res: express.Response) => {
   try {
@@ -96,15 +91,13 @@ export const register = async (req: express.Request, res: express.Response) => {
       email,
       username,
       verified: false,
+      verificationCode,
       authentication: {
         salt,
         password: hashedPassword,
       },
     });
-    const verification = await createVerification({
-      email,
-      verificationCode,
-    });
+    const verification = await updateUserByEmail(email, { verificationCode });
 
     const emailResponse = await sendVerificationEmail({
       email,
@@ -139,11 +132,10 @@ export const verify = async (req: express.Request, res: express.Response) => {
         .end();
     }
 
-    const existingUser = await getUserByEmail(email);
-
-    const verification = await getVerificationByEmail(email).select(
+    const existingUser = await getUserByEmail(email).select(
       "+verificationCode"
     );
+
     if (!existingUser) {
       res
         .status(404)
@@ -154,8 +146,7 @@ export const verify = async (req: express.Request, res: express.Response) => {
         .end();
     }
 
-    if (existingUser && verification.verificationCode !== code) {
-      await deleteVerificationsByEmail(email);
+    if (existingUser.verificationCode !== code) {
       const verificationCode = verificationCodeGen();
       const emailResponse = await sendVerificationEmail({
         email,
@@ -163,8 +154,7 @@ export const verify = async (req: express.Request, res: express.Response) => {
       });
 
       if (emailResponse === true) {
-        await createVerification({
-          email,
+        await updateUserByEmail(email, {
           verificationCode,
         });
         return res
@@ -183,9 +173,11 @@ export const verify = async (req: express.Request, res: express.Response) => {
       }
     }
 
-    if (existingUser && verification.verificationCode === code) {
-      await deleteVerificationsByEmail(email);
-      await verifyUserByEmail(email);
+    if (existingUser.verificationCode === code) {
+      await updateUserByEmail(email, {
+        verified: true,
+        verificationCode: null,
+      });
       return res
         .status(200)
         .json({ message: "Your account has been verified!" })
