@@ -1,18 +1,23 @@
 import mongoose from "mongoose";
+import { Types } from "@constfitness/types";
 
-const Activity = new mongoose.Schema({
+const Activity = new mongoose.Schema<Types.Activity>({
   name: { type: String, required: true },
-  reps: { type: Number, required: true },
-  sets: { type: Number, required: true },
-  setsRest: { type: Number, required: true },
+  repsAmount: { type: Number, required: true },
+  setsAmount: { type: Number, required: true },
+  restSeconds: { type: Number, required: true },
 });
 
-const userSchema = new mongoose.Schema({
+const Workout = new mongoose.Schema<Types.Workout>({
+  date: { type: Date, required: true },
+  _id: { type: String, required: true },
+  completion: { type: Number, required: true },
+  activies: { type: [Activity], required: true },
+});
+
+const userSchema = new mongoose.Schema<Types.User>({
   username: { type: String, required: true },
   email: { type: String, required: true },
-  fitnessMotive: {
-    motive: { type: String },
-  },
   schedule: {
     sunday: [Activity],
     monday: [Activity],
@@ -28,7 +33,7 @@ const userSchema = new mongoose.Schema({
   authentication: {
     salt: { type: String, required: true, select: false },
     password: { type: String, required: true, select: false },
-    sessionToken: { type: String, required: false, select: false },
+    sessionToken: { type: String, select: false },
   },
 });
 
