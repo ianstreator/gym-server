@@ -22,34 +22,42 @@ export const login = async (req: express.Request, res: express.Response) => {
     const user = await getUserByEmail(email).select(
       "+authentication.salt +authentication.password +verified"
     );
+    const expectedHash = authentication(user.authentication.salt, password);
+
+    if (!user || user.authentication.password !== expectedHash) {
+      return res
+        .status(401)
+        .json({ message: "Incorrect email or password." })
+        .end();
+    }
     if (user && !user.verified) {
       return res
         .status(403)
         .json({
-          message: `You have not verified your account, we have sent a new code to ${email}`,
+          message: `You have not verified your account, check your email or request a new code.`,
         })
         .end();
     }
-    const expectedHash = authentication(user.authentication.salt, password);
 
-    if (!user || user.authentication.password !== expectedHash) {
-      return res.status(401).json({ message: "Incorrect email or password." });
-    }
-
-    const salt = random();
+    // const salt = random();
 
     user.authentication.sessionToken = authentication(
-      salt,
+      random(),
       user._id.toString()
     );
 
     await user.save();
 
-    res.cookie("CONST_AUTH", user.authentication.sessionToken, {
-      domain: ENV_CORS_URL,
-      path: "/",
-    });
-    return res.status(200).json({ user, message: "Successful login!" }).end();
+    res.cookie("const_sessionToken", user.authentication.sessionToken);
+
+    const clientUser = { ...user.toObject() };
+    delete clientUser.authentication;
+    console.log(clientUser);
+
+    return res
+      .status(200)
+      .json({ user: clientUser, message: "Successful login!" })
+      .end();
   } catch (error) {
     console.log(error);
     res.sendStatus(500);
@@ -123,6 +131,7 @@ export const register = async (req: express.Request, res: express.Response) => {
 export const verify = async (req: express.Request, res: express.Response) => {
   try {
     const { email, code } = req.body;
+    console.log(email);
     if (!email || !code) {
       return res
         .status(400)
@@ -137,11 +146,19 @@ export const verify = async (req: express.Request, res: express.Response) => {
     );
 
     if (!existingUser) {
-      res
+      return res
         .status(404)
         .json({
           message:
             "No user under that email exists. Please register before attempting to verify.",
+        })
+        .end();
+    }
+    if (existingUser.verified) {
+      return res
+        .status(200)
+        .json({
+          message: "Your email is already verified. You may now log in.",
         })
         .end();
     }
