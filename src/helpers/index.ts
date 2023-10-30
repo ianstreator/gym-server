@@ -39,24 +39,30 @@ export const sendVerificationEmail = async ({
     },
   } as SMTPTransport.Options);
 
+  const emailColors = {
+    primary: "#1E293B",
+    secondary: "#1A2333",
+    gold: "#FCD34D",
+    white: "#FFFFFF",
+  };
   const options: nodeMailer.SendMailOptions = {
     from: appEmail,
     to: email,
     subject: "Verification Code",
     html: `
-    <body style="color: white;">
-      <div style="padding: 20px;text-align: center; background-color: #3D3D3D;">
+    <body style="color: ${emailColors.white};">
+      <div style="padding: 20px;text-align: center; background-color: ${emailColors.primary};">
         <img src="https://constfitness.vercel.app/const-logo.png" alt="const-logo" width="200" height="200">
-        <p>
-        Your <span style="font-weight: bolder">CONSTfitness</span> verification code
+        <p style="color: ${emailColors.white};">
+        Your <span style="font-weight: bolder;">CONST</span> verification code
         </p>
-        <div style="background-color: #2D2D2D; text-align: center; padding: 8px; border-radius: 4px; color: #FFD568; font-weight: bold;">
+        <div style="background-color: ${emailColors.secondary}; text-align: center; padding: 8px; border-radius: 4px; color: ${emailColors.gold}; font-weight: bold;">
         ${verificationCode}
         </div>
-        <p>
+        <p style="color: ${emailColors.white};">
         or click the following link
         </p>
-        <div style="background-color: #2D2D2D; text-align: center; padding: 8px; border-radius: 4px; color: #FFD568; font-weight: bold;">
+        <div style="background-color: ${emailColors.secondary}; text-align: center; padding: 8px; border-radius: 4px; color: ${emailColors.gold}; font-weight: bold;">
         <a href="${ENV_CORS_URL}/verify?email=${email}&code=${verificationCode}">${ENV_CORS_URL}/verify?email=${email}&code=${verificationCode}</a>
         </div>
       </div>
