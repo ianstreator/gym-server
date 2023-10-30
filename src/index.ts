@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 import express from "express";
 import bodyParser from "body-parser";
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import mongoose from "mongoose";
 import router from "./router/index.js";
@@ -10,7 +11,8 @@ const app = express();
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
-app.use(cors({ origin: ENV_CORS_URL }));
+app.use(cookieParser());
+app.use(cors({ origin: ENV_CORS_URL, credentials: true }));
 
 mongoose.Promise = Promise;
 mongoose.connect(process.env.URI);
